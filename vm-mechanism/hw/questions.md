@@ -22,15 +22,18 @@ virtual addresses are within bounds?
 3. Run with these flags: -s 1 -n 10 -l 100. What is the maximum value that base can be set to, such that the address space still
 fits into physical memory in its entirety?
 
-    - 16k - 1 - base >= 100, base <= 16 * 1024 - 100 - 1 = 16283
+    - base + (limit - 1) <= PA, base + (100 - 1) <= 16k - 1, base = 16k - 100 = 16284
 
 4. Run some of the same problems above, but with larger address
 spaces (-a) and physical memories (-p).
 
-    - 
+    - ![q4-1](./q4-1.png)
+    - ![q4-2](./q4-2.png)
+    - ![q4-3](./q4-3.png)
 
 5. What fraction of randomly-generated virtual addresses are valid,
 as a function of the value of the bounds register? Make a graph
 from running with different random seeds, with limit values ranging from 0 up to the maximum size of the address space.
 
-    - 
+    - [q5.py](./q5.py)
+    - ![q5.png](./q5.png)
