@@ -7,14 +7,33 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 1. Let’s examine a simple program, “loop.s”. First, just read and understand it. Then, run it with these arguments (./x86.py -t 1 -p loop.s -i 100 -R dx) This specifies a single thread, an interrupt every 100 instructions, and tracing of register %dx. What will %dx be during the run? Use the -c flag to check your answers; the answers, on the left, show the value of the register (or memory value) after the instruction on the right has run.
 
     > ![q1](./q1.png)
+    > Since no initial value is provided, %dx defaults to 0. The first instruction (sub $1, %dx) decrements %dx to -1. The test and jgte instructions check if %dx is greater than or equal to 0. Since -1 is not, the loop condition fails, and the program halts immediately. Therefore, %dx will just be -1 during the run.
 
 2. Same code, different flags: (./x86.py -p loop.s -t 2 -i 100 -a dx=3,dx=3 -R dx) This specifies two threads, and initializes each %dx to 3. What values will %dx see? Run with -c to check. Does the presence of multiple threads affect your calculations? Is there a race in this code?
 
+    > ![q2](./q2.png)
+    > What values will %dx see?
+
+        For each thread, the %dx register will start at 3 and sequentially see the values 2, 1, 0, and finally -1 before the thread halts.
     >
+    > Does the presence of multiple threads affect your calculations?
+
+        No, the presence of multiple threads does not affect the calculations at all. Because the interrupt interval (-i 100) is much larger than the total instructions needed for each thread, Thread 0 will finish its execution completely before Thread 1 even starts.
+    >
+    > Is there a race in this code?
+
+        No, there is no race condition here. A race condition occurs when multiple threads concurrently access and modify shared data. In this program, the threads are only modifying the %dx register. Since CPU registers are saved and restored during context switches, they act as private, per-thread state. Therefore, the threads are completely independent and do not interfere with each other.
 
 3. Run this: ./x86.py -p loop.s -t 2 -i 3 -r -R dx -a dx=3,dx=3 This makes the interrupt interval small/random; use different seeds (-s) to see different interleavings. Does the interrupt frequency change anything?
 
-    >
+    > ![q3](./q3.png)
+    > Does the interrupt frequency change anything?
+
+        It changes the interleaving (the order of execution), but it does not change the final outcome or the correctness of the program.
+
+        By setting a small and random interrupt interval (-i 3 -r), the CPU context-switches frequently between Thread 0 and Thread 1, making the execution trace look chaotic. However, because the %dx register is a private, per-thread state, the OS (simulator) saves and restores its value during every context switch.
+
+        Since there is no shared memory being accessed, these aggressive and random interrupts do not cause any data corruption or race conditions. Each thread will still independently and correctly count down its own %dx from 3 to -1.
 
 4. Now, a different program, looping-race-nolock.s, which accesses a shared variable located at address 2000; we’ll call this variable value. Run it with a single thread to confirm your understanding: ./x86.py -p looping-race-nolock.s -t 1 -M 2000 What is value (i.e., at memory address 2000) throughout the run? Use -c to check.
 
