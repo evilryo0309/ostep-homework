@@ -68,10 +68,48 @@ This program, x86.py, allows you to see how different thread interleavings eithe
     > ![q6-1](./q6-1.png)
     > ![q6-2](./q6-2.png)
     > ![q6-3](./q6-3.png)
+    > Can you tell by looking at the thread interleaving what the final value will be?
+
+        Yes. By tracing the sequence of instructions (specifically when mov 2000, %ax and mov %ax, 2000 occur for each thread), we can determine if a thread is reading a "stale" (outdated) value from memory before the other thread has a chance to write its updated value back. If this happens, an update is lost, and the final value will be lower than expected.
+    >
+    > Does the timing of the interrupt matter?
+
+        Yes, the timing of the interrupt matters completely. It determines whether a race condition actually corrupts the data or not.
+    >
+    > Where can it safely occur? Where not?
+
+        Safe: It is safe for an interrupt to occur before the shared value is loaded into the register, or after the updated value has been safely written back to memory. (e.g., during the loop control instructions like sub, test, or jgt).
+
+        Not Safe: It is unsafe for an interrupt to occur between the loading of the shared variable and the storing of the updated variable.
+    >
+    > Where is the critical section exactly?
+
+        The critical section consists of the three instructions that Read, Modify, and Write the shared variable:
+
+        mov 2000, %ax       # Load shared variable
+        add $1, %ax         # Modify the value
+        mov %ax, 2000       # Store updated value back
+
+        These three instructions must be executed atomically (as a single, indivisible unit) to prevent data corruption.
 
 7. Now examine fixed interrupt intervals: ./x86.py -p looping-race-nolock.s -a bx=1 -t 2 -M 2000 -i 1 What will the final value of the shared variable value be? What about when you change -i 2, -i 3, etc.? For which interrupt intervals does the program give the “correct” answer?
 
+    > ![q7-1](./q7-1.png)
+    > ![q7-2](./q7-2.png)
+    > ![q7-3](./q7-3.png)
+    > What will the final value of the shared variable value be (with -i 1)?
+
+        With -i 1, the final value will be 1 (which is incorrect, as it should be 2). Because the context switch happens after every single instruction, both threads read the initial value (0) before either has a chance to write the updated value (1) back to memory.
     >
+    > What about when you change -i 2, -i 3, etc.?
+
+        With -i 2, the final value is still 1. A thread is interrupted right after it modifies its register but before it stores the result back to memory. Thus, the update is still lost.
+
+        With -i 3, the final value is 2 (which is correct!). The critical section (load, add, store) takes exactly 3 instructions. With -i 3, Thread 0 is able to finish the entire critical section atomically before the context switch occurs. Therefore, Thread 1 reads the safely updated value.
+    >
+    > For which interrupt intervals does the program give the “correct” answer?
+
+        For this specific case where each thread only loops once (-a bx=1), the program gives the correct answer for any interrupt interval -i >= 3. As long as the interval allows the thread to execute the 3 critical section instructions consecutively without interruption, no data will be overwritten.
 
 8. Run the same for more loops (e.g., set -a bx=100). What interrupt intervals (-i) lead to a correct outcome? Which intervals are surprising?
 
