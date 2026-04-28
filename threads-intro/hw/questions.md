@@ -37,15 +37,37 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 
 4. Now, a different program, looping-race-nolock.s, which accesses a shared variable located at address 2000; we’ll call this variable value. Run it with a single thread to confirm your understanding: ./x86.py -p looping-race-nolock.s -t 1 -M 2000 What is value (i.e., at memory address 2000) throughout the run? Use -c to check.
 
-    >
+    > ![q4](./q4.png)
+    > What is value (i.e., at memory address 2000) throughout the run?
+
+        The value at memory address 2000 starts at 0 and ends at 1.
+
+        Because we did not specify an initial value for the loop counter %bx (using the -a flag), %bx defaults to 0.
+        During the first and only iteration:
+
+           1. The thread loads the value at address 2000 (which is 0) into %ax.
+           2. It increments %ax by 1 (so %ax becomes 1).
+           3. It stores %ax back into address 2000, making the value at 2000 equal to 1.
+
+        Right after the critical section, the sub $1, %bx instruction changes %bx to -1. Since -1 is not greater than 0, the jgt (Jump if Greater Than) condition fails, and the program halts. Therefore, the critical section is executed exactly once, and the shared variable remains at 1.
 
 5. Run with multiple iterations/threads: ./x86.py -p looping-race-nolock.s -t 2 -a bx=3 -M 2000 Why does each thread loop three times? What is final value of value?
 
+    > ![q5](./q5.png)
+    > Why does each thread loop three times?
+
+        The -a bx=3 flag initializes the %bx register to 3, which acts as the loop counter. At the end of each iteration, the sub $1, %bx instruction decrements the counter, and jgt .top checks if it is strictly greater than 0. The values evaluated will be 2, 1, and 0. When %bx reaches 0, the jump condition fails and the loop halts. Therefore, each thread executes the loop exactly three times.
     >
+    > What is the final value of value?
+
+        The final value of the shared variable at memory address 2000 is 6.
+        Since we did not specify an interrupt interval (-i), the simulator uses the default interval (50 instructions). A thread requires fewer than 20 instructions to complete all three loops. Consequently, Thread 0 executes completely without being interrupted, incrementing the value from 0 to 3. Afterward, a context switch occurs, and Thread 1 runs completely, incrementing the value from 3 to 6. No harmful interleaving occurs in this specific run.
 
 6. Run with random interrupt intervals: ./x86.py -p looping-race-nolock.s -t 2 -M 2000 -i 4 -r -s 0 with different seeds (-s 1, -s 2, etc.) Can you tell by looking at the thread interleaving what the final value of value will be? Does the timing of the interrupt matter? Where can it safely occur? Where not? In other words, where is the critical section exactly?
 
-    >
+    > ![q6-1](./q6-1.png)
+    > ![q6-2](./q6-2.png)
+    > ![q6-3](./q6-3.png)
 
 7. Now examine fixed interrupt intervals: ./x86.py -p looping-race-nolock.s -a bx=1 -t 2 -M 2000 -i 1 What will the final value of the shared variable value be? What about when you change -i 2, -i 3, etc.? For which interrupt intervals does the program give the “correct” answer?
 
