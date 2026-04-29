@@ -113,10 +113,46 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 
 8. Run the same for more loops (e.g., set -a bx=100). What interrupt intervals (-i) lead to a correct outcome? Which intervals are surprising?
 
+    > What interrupt intervals (-i) lead to a correct outcome?
+
+        There are two categories of intervals that lead to the correct outcome (a final value of 200):
+
+        Large Intervals: Any interval greater than or equal to the total number of instructions per thread (i.e., -i >= 601). This allows each thread to complete all 100 iterations without any context switch.
+
+        Multiples of 3: Any interval that is a multiple of 3 (e.g., -i 3, -i 6, -i 9, -i 12, etc.).
     >
+    > Which intervals are surprising?
+
+        The intervals that are multiples of 3 are surprising because they cause frequent context switches, yet still produce the correct result.
+
+        Why this happens: A single loop iteration consists of exactly 6 instructions. The first 3 instructions form the critical section (read, modify, write the shared variable), and the last 3 instructions handle loop control (using the private register %bx).
+        Because the critical section is exactly 3 instructions long, an interrupt interval that is a multiple of 3 will always trigger the context switch either exactly after the critical section is completed or exactly at the end of the loop. The interrupt perfectly aligns with the logical boundaries of the code, meaning it will never slice through the middle of the critical section. Thus, no race conditions occur!
 
 9. One last program: wait-for-me.s. Run: ./x86.py -p wait-for-me.s -a ax=1,ax=0 -R ax -M 2000 This sets the %ax register to 1 for thread 0, and 0 for thread 1, and watches %ax and memory location 2000. How should the code behave? How is the value at location 2000 being used by the threads? What will its final value be?
 
+    > ![q9](./q9.png)
+    > How should the code behave?
+        Thread 0 (initialized with %ax=1) acts as a "waiter" and will enter a spin-loop, continuously checking the value at memory location 2000. It will keep spinning until an interrupt occurs and the CPU switches to Thread 1. Thread 1 (initialized with %ax=0) acts as a "signaler". It sets the value at memory location 2000 to 1 and then halts. When Thread 0 eventually resumes, it sees the updated value (1), breaks out of its spin-loop, and halts.
     >
+    > How is the value at location 2000 being used by the threads?
+
+        The memory location 2000 is being used as a synchronization flag (or a condition variable). It allows one thread to signal to another thread that a certain event has occurred, effectively coordinating their execution order.
+    >
+    > What will its final value be?
+
+        The final value at memory location 2000 will be 1.
 
 10. Now switch the inputs: ./x86.py -p wait-for-me.s -a ax=0,ax=1 -R ax -M 2000 How do the threads behave? What is thread 0 doing? How would changing the interrupt interval (e.g., -i 1000, or perhaps to use random intervals) change the trace outcome? Is the program efficiently using the CPU?
+
+    > ![q10](./q10.png)
+    > How do the threads behave? What is thread 0 doing?
+
+        Since Thread 0 starts first and its %ax is initialized to 0, it acts as the signaler. It immediately sets the shared memory value at address 2000 to 1 and then halts. Afterward, Thread 1 (the waiter, %ax=1) runs, immediately sees that the value is already 1, and halts without ever needing to enter its spin-wait loop.
+    >
+    > How would changing the interrupt interval change the trace outcome?
+
+        Changing the interrupt interval to a large number (like -i 1000) or using random intervals would have little to no effect on the trace outcome. Because Thread 0 (the signaler) finishes its job and halts in just a few instructions, it voluntarily yields the CPU long before a large interrupt interval is reached.
+    >
+    > Is the program efficiently using the CPU?
+
+        Yes, in this specific scenario, the program is using the CPU very efficiently. Because the signaler (Thread 0) runs before the waiter (Thread 1), the condition flag is set before the waiter even checks it. Consequently, Thread 1 does not waste any CPU cycles spin-waiting (busy-waiting), which is a massive improvement in efficiency compared to the scenario in question 9.
