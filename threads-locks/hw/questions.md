@@ -138,6 +138,10 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 
 11. Now study the code for the ticket lock in ticket.s. Does it match the code in the chapter? Then run with the following flags: -a bx=1000,bx=1000 (causing each thread to loop through the critical section 1000 times). Watch what happens; do the threads spend much time spin-waiting for the lock?
 
+    ```text
+    ./x86.py -p ticket.s -M ticket,turn,count -a bx=1000,bx=1000 -c -S
+    ```
+
     > ![q11](./q11.png)
 
     ```text
@@ -170,13 +174,21 @@ This program, x86.py, allows you to see how different thread interleavings eithe
     ./x86.py -p test-and-set.s -M mutex,count -a bx=100,bx=100 -c -S
     ```
 
-    > ![q14-1](./q14-1.png)
+    > ![q13-1](./q13-1.png)
 
     ```text
     ./x86.py -p yield.s -M mutex,count -a bx=100,bx=100 -c -S
     ```
 
-    > ![q14-2](./q14-2.png)
+    > ![q13-2](./q13-2.png)
+
+    ```text
+    - Scenario: A scenario where test-and-set.s wastes cycles but yield.s does not is when a context switch occurs while one thread is already inside the critical section. The newly scheduled thread cannot acquire the lock. In test-and-set.s, this thread will uselessly spin (executing xchg and test) until its entire time slice (e.g., 50 instructions) expires. In yield.s, the thread checks the lock once, sees it is held, and immediately executes the yield instruction to voluntarily give up the CPU.
+
+    - Instructions Saved: Based on the experimental results running 100 iterations per thread with -i 50, test-and-set.s took 3354 instructions, while yield.s took only 2334 instructions. The yield instruction saved exactly 1020 instructions in this specific run.
+
+    - When Savings Arise: These savings arise most prominently when the interrupt frequency (time slice) is large, and there is high contention for the lock. Without yield, a large time slice means a large amount of wasted spinning. Yield cuts this waste short by immediately triggering a context switch.
+    ```
 
 14. Finally, examine test-and-test-and-set.s. What does this lock do? What kind of savings does it introduce as compared to test-and-set.s?
 
