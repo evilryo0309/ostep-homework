@@ -167,8 +167,8 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 
     > How is the value at location 2000 being used by the threads?
 
-        - The memory location 2000 is being used as a synchronization flag (or a condition variable). It allows one thread to signal to another thread that a certain event has occurred, effectively coordinating their execution order.
-
+        - It is used as a synchronization flag to indicate that a specific condition has been met (signaled).
+    
     > What will its final value be?
 
         - The final value at memory location 2000 will be 1.
@@ -176,18 +176,19 @@ This program, x86.py, allows you to see how different thread interleavings eithe
 
 10. Now switch the inputs: ./x86.py -p wait-for-me.s -a ax=0,ax=1 -R ax -M 2000 How do the threads behave? What is thread 0 doing? How would changing the interrupt interval (e.g., -i 1000, or perhaps to use random intervals) change the trace outcome? Is the program efficiently using the CPU?
 
-    > ![q10](./q10.png)
+    > ![q10-1](./q10-1.png)
+    > ![q10-2](./q10-2.png)
+    > ![q10-3](./q10-3.png)
 
     ```text
     > How do the threads behave? What is thread 0 doing?
 
-        - Since Thread 0 starts first and its %ax is initialized to 0, it acts as the signaler. It immediately sets the shared memory value at address 2000 to 1 and then halts. Afterward, Thread 1 (the waiter, %ax=1) runs, immediately sees that the value is already 1, and halts without ever needing to enter its spin-wait loop.
+        - With the inputs swapped (-a ax=0,ax=1), Thread 0 acts as the waiter and Thread 1 acts as the signaler. Because the OS schedules Thread 0 to run first, it checks the shared memory at address 2000 (the condition flag) and sees that it is 0. Consequently, Thread 0 gets trapped in a spin-loop, repeatedly executing the same read-and-test instructions (busy-waiting) until a hardware interrupt forcefully triggers a context switch.
 
     > How would changing the interrupt interval change the trace outcome?
 
-        - Changing the interrupt interval to a large number (like -i 1000) or using random intervals would have little to no effect on the trace outcome. Because Thread 0 (the signaler) finishes its job and halts in just a few instructions, it voluntarily yields the CPU long before a large interrupt interval is reached.
-
+        - Changing the interrupt interval drastically impacts the trace and highlights the flaw in this execution order. For example, if the interval is set to -i 1000, Thread 0 is forced to execute 1,000 completely useless instructions (spinning in the loop) before the CPU is handed over to Thread 1. Thread 1 then takes only a few instructions to set the flag to 1 and halt. If we used random intervals (-r), the amount of wasted CPU cycles would be unpredictable, depending entirely on when the random interrupt occurs.
     > Is the program efficiently using the CPU?
 
-        - Yes, in this specific scenario, the program is using the CPU very efficiently. Because the signaler (Thread 0) runs before the waiter (Thread 1), the condition flag is set before the waiter even checks it. Consequently, Thread 1 does not waste any CPU cycles spin-waiting (busy-waiting), which is a massive improvement in efficiency compared to the scenario in question 9.
+        - No, it is highly inefficient. Thread 0 is consuming CPU cycles doing no useful work (spin-waiting) just to wait for an interrupt that allows Thread 1 to execute.
     ```
